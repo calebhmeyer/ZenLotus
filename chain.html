@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Edge-Hugging Gold Chains</title>
+<style>
+  html,body{
+      height:100%;
+      margin:0;
+      background:#7EDBD5;   /* dark-teal backdrop */
+      overflow:hidden;
+  }
+</style>
+</head>
+<body>
+
+<svg id="scene" width="100%" height="1100"
+     viewBox="0 0 100 1100"  <!-- JS rewrites width -->
+     aria-label="Two scrolling gold chains"></svg>
+
+<script>
+(() => {
+  /* ───────── CONFIG ───────── */
+  const GAP        = 210;
+  const LINKS_A    = 25;
+  const LINKS_B    = LINKS_A - 1;
+  const SPEED      = 2;      // px / frame
+  const SNAP_DIST  = 420;
+  const START_Y    = -300;
+  const HALF_W     = 30;     // half final width (after scale)
+
+  const svg = document.getElementById('scene');
+  const NS  = 'http://www.w3.org/2000/svg';
+
+  /* viewBox width = real viewport width */
+  const vpW = window.innerWidth;
+  svg.setAttribute('viewBox', `0 0 ${vpW} 1100`);
+
+  /* ---------- defs ---------- */
+  svg.innerHTML = `
+  <defs>
+    <!-- gold glow -->
+    <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
+      <feDropShadow dx="0" dy="0" stdDeviation="5"
+                    flood-color="#ffe8a8" flood-opacity=".95"/>
+    </filter>
+
+    <!-- Strand-A gradient: dark-amber → light-citrine -->
+    <linearGradient id="gradA" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="50%" stop-color="#4c2a00"/>   <!-- very dark amber -->
+      <stop offset="75%" stop-color="#d8a040"/>   <!-- warm gold -->
+      <stop offset="100%" stop-color="#ffe8a8"/>  <!-- light citrine -->
+    </linearGradient>
+    <!-- Strand-B gradient (reverse direction) -->
+    <linearGradient id="gradB" x1="100%" y1="0%" x2="0%" y2="0%">
+      <stop offset="50%" stop-color="#4c2a00"/>
+      <stop offset="75%" stop-color="#d8a040"/>
+      <stop offset="100%" stop-color="#ffe8a8"/>
+    </linearGradient>
+
+    <!-- disc & helpers -->
+    <circle id="disc" cx="0" cy="0" r="60"/>
+    <mask id="mask">
+      <circle cx="0" cy="0"  r="60" fill="#fff"/>
+      <circle cx="0" cy="-44" r="14" fill="#000"/>
+      <circle cx="0" cy=" 44" r="14" fill="#000"/>
+    </mask>
+    <clipPath id="clipL"><rect x="-60" y="-60" width="60" height="120"/></clipPath>
+    <clipPath id="clipR"><rect x="0"   y="-60" width="60" height="120"/></clipPath>
+  </defs>
+  <g id="chains"></g>`;
+
+  const chainsGroup = svg.querySelector('#chains');
+
+  /* helper: make half-disc */
+  const half = ({clip, grad, glow=false})=>{
+      const u=document.createElementNS(NS,'use');
+      u.setAttribute('href','#disc');
+      u.setAttribute('clip-path',`url(${clip})`);
+      u.setAttribute('mask','url(#mask)');
+      u.setAttribute('fill',`url(${grad})`);
+      if(glow) u.setAttribute('filter','url(#glow)');
+      return u;
+  };
+
+  /* build one full chain */
+  function buildChain(x){
+      const wrap=document.createElementNS(NS,'g');
+      wrap.classList.add('chain');
+      wrap.setAttribute('data-x',x);
+      wrap.setAttribute('transform',`translate(${x} ${START_Y})`);
+
+      const inner=document.createElementNS(NS,'g');
+      inner.setAttribute('transform','scale(.5 1)');
+      wrap.appendChild(inner);
+
+      const dark  = document.createElementNS(NS,'g');
+      const bright= document.createElementNS(NS,'g');
+      inner.appendChild(dark);
+      inner.appendChild(bright);
+
+      // Strand A (dark left, bright right)
+      for(let i=0;i<LINKS_A;i++){
+          dark  .appendChild(half({clip:'#clipL', grad:'#gradA'}));
+          bright.appendChild(half({clip:'#clipR', grad:'#gradA', glow:true}));
+      }
+      // Strand B (dark right, bright left)
+      for(let i=0;i<LINKS_B;i++){
+          dark  .appendChild(half({clip:'#clipR', grad:'#gradB'}));
+          bright.appendChild(half({clip:'#clipL', grad:'#gradB', glow:true}));
+      }
+
+      const pos=(i,s)=> s==='A' ? i*GAP : (i+0.5)*GAP;
+      [...dark.children].forEach((el,i)=>{
+          const s = i<LINKS_A ? 'A' : 'B';
+          const j = i<LINKS_A ?  i  : i-LINKS_A;
+          el.setAttribute('transform',`translate(0 ${pos(j,s)})`);
+      });
+      [...bright.children].forEach((el,i)=>{
+          const s = i<LINKS_A ? 'A' : 'B';
+          const j = i<LINKS_A ?  i  : i-LINKS_A;
+          el.setAttribute('transform',`translate(0 ${pos(j,s)})`);
+      });
+      return wrap;
+  }
+
+  /* build left & right chains (10 px in from edges) */
+  const leftX  = 10  + HALF_W;
+  const rightX = vpW - 10 - HALF_W;
+  chainsGroup.appendChild(buildChain(leftX));
+  chainsGroup.appendChild(buildChain(rightX));
+
+  /* scroll loop */
+  let y = START_Y;
+  function tick(){
+      y -= SPEED;
+      if((START_Y - y) >= SNAP_DIST) y = START_Y;
+      document.querySelectorAll('.chain').forEach(chain=>{
+          const x = chain.getAttribute('data-x');
+          chain.setAttribute('transform',`translate(${x} ${y})`);
+      });
+      requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+})();
+</script>
+</body>
+</html>
